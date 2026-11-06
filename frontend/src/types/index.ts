@@ -62,3 +62,10 @@ export interface ApiError {
   error?: string;
   message?: string;
 }
+
+export type AlbumSortKey = 'year' | 'name' | 'artist';
+export type AlbumSortWay = 'up' | 'down';
+export interface AlbumOrder {
+  key: AlbumSortKey;
+  way: AlbumSortWay;
+}

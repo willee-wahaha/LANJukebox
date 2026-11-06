@@ -1,9 +1,12 @@
 import logging
 
-from flask import Blueprint, jsonify, send_from_directory, abort
+from flask import Blueprint, jsonify, send_from_directory, abort, request
 
 import config
 from tools import music, utils
+from tools.player import player
+from tools.playqueue import playqueue
+from tools.playcontroller import playcontroller, Task
 
 albums_bp = Blueprint("albums", __name__, url_prefix="/api")
 
@@ -34,6 +37,9 @@ def get_all_albums():
             "year": music.songs[songs[0]]["year"],
             "cover": music.songs[songs[0]]["thumbnail"]
         })
+
+    albums = sorted(albums, key=lambda x: (x['year'], x['name']))
+    albums.reverse()
 
     return jsonify(albums)
 
@@ -82,3 +88,57 @@ def get_cover(album_id):
         cover_path,
         inp
     )
+
+
+@albums_bp.route("/albums/refresh", methods=["POST"])
+def rescan():
+
+    playcontroller.clear_queue()
+    playcontroller.put_task([
+        Task(playqueue.clear),
+        Task(player.stop)
+    ])
+
+    music.build_music_list(reload=True)
+
+    return jsonify({ "success": True })
+
+
+@albums_bp.route("/albums/order", methods=["POST"])
+def setorder():
+    data = request.get_json()
+
+    if data is None:
+        return jsonify({"error": "error"}), 400
+
+    if data.get("key", None) is None or data.get("way", None) is None:
+        return jsonify({"error": "error"}), 400
+
+    if data["key"] not in ('year', 'name', 'artist') or data["way"] not in ('up', 'down'):
+        return jsonify({"error": "error"}), 400
+
+    key = data["key"]
+    if key == 'artist':
+        key = "albumartist"
+
+    albums = []
+    
+    for album_id, songs in music.albums_to_songs.items():
+
+        if not songs:
+            continue
+
+        albums.append({
+            "id": album_id,
+            "name": music.id_to_albums[album_id]["name"],
+            "albumartist": music.songs[songs[0]]["albumartist"],
+            "song_count": len(songs),
+            "year": music.songs[songs[0]]["year"],
+            "cover": music.songs[songs[0]]["thumbnail"]
+        })
+
+    albums = sorted(albums, key=lambda x: (x[key], x['name']))
+    if data["way"] == 'down':
+        albums.reverse()
+
+    return jsonify(albums)

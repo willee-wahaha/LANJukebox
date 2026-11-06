@@ -114,6 +114,11 @@ def scan_music(musics: list[Path]):
         artist = audio.get("artist", ["Unknown"])[0]
 
         year = audio.get("year", ["Unknown"])[0]
+        if year == "Unknown":
+            year = audio.get("date", ["Unknown"])[0]
+            if year != "Unknown":
+                year = year.split('-')[0]
+
 
         disknum = utils.int_check(re.sub(r"\D", "", audio.get("discnumber", ["0"])[0]), 0)
         tracknum = utils.int_check(re.sub(r"\D", "", audio.get("tracknumber", ["0"])[0]), 0)

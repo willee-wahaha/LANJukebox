@@ -1,5 +1,5 @@
 import './style.css';
-import { getAlbums, getAlbumSongs } from './api/albums';
+import { getAlbums, getAlbumSongs, refreshDatabase, setAlbumOrder } from './api/albums';
 import { searchSongs, searchFromYt } from './api/songs';
 import {
   getPlayerStatus, playSong, pausePlayer, resumePlayer, stopPlayer,
@@ -10,7 +10,10 @@ import {
   getPlaylist, addToPlaylist, playPlaylist, playPlaylistFrom, removeFromPlaylist,
   clearPlaylist,
 } from './api/playlist';
-import type { Album, Song, PlayerStatus, PlaylistResponse, AudioDevice, RepeatMode } from './types';
+import type { 
+  Album, Song, PlayerStatus, PlaylistResponse, AudioDevice, RepeatMode ,
+  AlbumSortKey, AlbumOrder,
+} from './types';
 import { Router } from './pages/router';
 
 type View = 'home' | 'album' | 'search';
@@ -19,6 +22,7 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 const router = new Router();
 
 let albums: Album[] = [];
+let albumOrder: AlbumOrder = { key: 'year', way: 'down'};
 let currentView: View = 'home';
 let currentAlbum: Album | null = null;
 let currentAlbumSongs: Song[] = [];
@@ -30,7 +34,6 @@ let playerStatus: PlayerStatus = {
 let searchKeyword = '';
 let statusTimer: number | undefined;
 let queueOpen = false;
-let busy = false;
 let lastPlayerCoverKey = '';
 let audioDevices: AudioDevice[] = [];
 let seeking = false;
@@ -160,9 +163,23 @@ function currentDurationFromQueue(): number {
 function renderHome(): void {
   const content = document.querySelector<HTMLDivElement>('#content')!;
   content.innerHTML = `
-    <div class="section-heading"><div><span class="eyebrow">COLLECTION</span><h2>所有專輯</h2></div><span class="muted">${albums.length} 張專輯</span></div>
+    <div class="section-heading">
+      <div><span class="eyebrow">COLLECTION</span><h2>所有專輯</h2></div>
+      <div class="album-count">
+        <span class="muted">${albums.length} 張專輯</span>
+        <label class="order-picker" title="專輯排序">
+          <button class="back-link" data-action="album-order-way">${albumOrder.way === "up" ? "升序" : "降序"}</button>
+          <select data-control="album-order-key" aria-label="專輯排序" title="專輯排序">
+            ${['year', 'name', 'artist'].map(key => `<option value="${esc(key)}" ${albumOrder.key === key ? 'selected' : ''}>${esc(key)}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+    </div>
     <div class="album-grid">
       ${albums.length ? albums.map(renderAlbumCard).join('') : '<div class="empty-state"><div class="empty-icon">♫</div><p>目前沒有專輯</p></div>'}
+    </div>
+    <div class="section-heading">
+      <button class="small-button" data-action="refresh-database">重新掃描</button>
     </div>
   `;
   bindContentEvents();
@@ -306,6 +323,22 @@ function bindContentEvents(): void {
   document.querySelectorAll<HTMLElement>('#content [data-action]').forEach(button => {
     button.addEventListener('click', () => void handleAction(button.dataset.action!));
   });
+  document.querySelector<HTMLSelectElement>('[data-control="album-order-key"]')?.addEventListener('change', async event => {
+
+    const select = event.currentTarget as HTMLSelectElement;
+    if (!select.value) return;
+    select.disabled = true;
+    try {
+      albumOrder.key = select.value as AlbumSortKey;
+      albums = await setAlbumOrder(albumOrder);
+      renderHome();
+    } catch (error) {
+      showToast(errorMessage(error));
+      renderHome();
+    } finally {
+      select.disabled = false;
+    }
+  });
 }
 
 async function handleAction(action: string): Promise<void> {
@@ -371,12 +404,24 @@ async function handleAction(action: string): Promise<void> {
       case 'toggle-shuffle':
         await updateMode({ shuffle: !playerStatus.shuffle, repeat: playerStatus.repeat });
         break;
-      case 'cycle-repeat': {
+      case 'cycle-repeat':
         const order: RepeatMode[] = ['off', 'all', 'one'];
         const next = order[(order.indexOf(playerStatus.repeat) + 1) % order.length];
         await updateMode({ shuffle: playerStatus.shuffle, repeat: next });
         break;
-      }
+      case 'refresh-database':
+        await refreshDatabase();
+        albums = await getAlbums();
+        albumOrder = { key: 'year', way: 'down'};
+        await refreshPlayerAndQueue();
+        renderHome();
+        break;
+      case 'album-order-way':
+        const way = albumOrder.way === "up" ? "down" : "up";
+        albumOrder.way = way
+        albums = await setAlbumOrder(albumOrder);
+        renderHome();
+        break;
     }
   } catch (error) {
     showToast(errorMessage(error));
@@ -504,7 +549,6 @@ function bindPlayerControls(bar: HTMLElement | null): void {
       await loadAudioDevices();
       updatePlayerBar();
     } finally {
-      busy = false;
       select.disabled = false;
     }
   });
@@ -563,7 +607,6 @@ async function loadAudioDevices(): Promise<void> {
 }
 
 function updatePlayerBar(): void {
-  if (busy) return;
   const old = document.querySelector<HTMLElement>('.player-bar');
   if (!old || seeking || 
     old.querySelector('[data-control="volume"]') === document.activeElement ||

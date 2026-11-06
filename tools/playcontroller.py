@@ -53,4 +53,12 @@ class PlayController:
                 self.wait_task = False
             self.newtask_appear.set()
 
+    def clear_queue(self):
+        while True:
+            try:
+                self.taskque.get_nowait()
+            except queue.Empty:
+                break
+
+
 playcontroller = PlayController()
