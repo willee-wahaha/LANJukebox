@@ -11,7 +11,7 @@ from tools.playcontroller import playcontroller, Task
 albums_bp = Blueprint("albums", __name__, url_prefix="/api")
 
 
-@albums_bp.route("/health")
+@albums_bp.route("/health", methods=["GET"])
 def health():
     return jsonify({
         "status": "ok",
