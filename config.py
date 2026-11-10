@@ -7,13 +7,24 @@ from dotenv import load_dotenv
 
 env_logger = logging.getLogger('env')
 
+template = """PORT=5000
+MUSIC_DIR=
+DATA_STORE_DIR=./Data
+COOKIE_PATH=./Data/coockie
+FFMPEG_PATH=
+"""
+
 if not load_dotenv():
     env_logger.warning("Can't read .env!")
+    with open('.env', 'w', encoding='utf-8') as f:
+        f.write(template)
+    env_logger.warning(".env is created from template, please fill the variables.")
+    exit()
 
 
 def get_env(key: str, default: Any | None = None) -> Any | None:
     val = os.getenv(key)
-    if val is None:
+    if val is None or val == "":
         env_logger.warning(f"Enviroment Variable \"{key}\" not exists!")
         return default
 
