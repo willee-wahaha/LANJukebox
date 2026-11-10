@@ -6,6 +6,7 @@ import threading
 import numpy as np
 import sounddevice as sd
 
+import config
 from classes.song import Song
 from tools.playqueue import playqueue
 
@@ -53,7 +54,7 @@ class AudioDecoder:
             return
 
         command = [
-            "ffmpeg",
+            config.FFMPEG_PATH,
             "-nostdin",
             "-v", "error",
             "-i", file_path,

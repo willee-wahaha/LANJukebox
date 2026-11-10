@@ -11,10 +11,11 @@ if not load_dotenv():
     env_logger.warning("沒讀取到環境變數!")
 
 
-def get_env(key: str) -> Any | None:
+def get_env(key: str, default: Any | None = None) -> Any | None:
     val = os.getenv(key)
     if val is None:
         env_logger.warning(f"環境變數 \"{key}\" 不存在!")
+        return default
 
     return val
 
@@ -24,6 +25,7 @@ MUSIC_DIR = Path(get_env("MUSIC_DIR"))
 SUPPORTED_EXTENSIONS = (".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".wma")
 DATA_STORE_DIR = Path(get_env("DATA_STORE_DIR"))
 COOKIE_PATH = Path(get_env("COOKIE_PATH"))
+FFMPEG_PATH = get_env("FFMPEG_PATH", "ffmpeg")
 
 
 if __name__ == '__main__':
