@@ -1,4 +1,9 @@
 # LANJukebox
+A personal music player built with Python Flask and Vite + TypeScript.
+
+The application runs on a computer and provides a web-based interface for playing music.
+
+You can contol the player from other devices over local network!
 
 ## Requirements
 
@@ -6,9 +11,9 @@
 - Node.js 24
 - FFmpeg
 
-Set `FFMPEG_PATH` in `.env` if your ffmpeg is not in global path.
+  Set `FFMPEG_PATH` in `.env` if your ffmpeg is not in global path.
 
-## Run
+## Install & Usage
 
 - Install python packages
   ```
@@ -40,7 +45,15 @@ Set `FFMPEG_PATH` in `.env` if your ffmpeg is not in global path.
   waitress-serve --host=0.0.0.0 --port=5000 --call app:create_app
   ```
 
-On Windows, you can run by these scripts.
+- Access by URL
+
+  http://localhost:5000
+
+  If you are using `npm run dev`, the vite server is at http://localhost:5173
+
+  Replace `localhost` with ip address when using other devices.
+
+On Windows, you can simply run by these scripts.
 ```
 # install dependecies
 ./install.ps1
