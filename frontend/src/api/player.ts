@@ -47,7 +47,5 @@ export const getAudioDevices = () =>
   apiRequest<{ devices: AudioDevice[]; selected_device_id: string }>('/player/devices');
 
 export const setAudioDevice = (deviceId: string) =>
-  apiRequest<{ success: boolean; selected_device_id: string; selected_device_name: string }>('/player/device', {
-    method: 'PUT',
-    body: jsonBody({ device_id: deviceId }),
-  });
+  apiRequest<{ success: boolean; selected_device_id: string; selected_device_name: string }>
+  (`/player/device/${deviceId}`, { method: 'PUT' });

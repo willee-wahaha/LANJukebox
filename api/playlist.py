@@ -62,7 +62,7 @@ def play():
     return jsonify({"status": "play"})
 
 
-@playlist_bp.route("/playfrom/<index>", methods=["POST"])
+@playlist_bp.route("/play/<index>", methods=["POST"])
 def playfrom(index):
     i = utils.int_check(index)
     

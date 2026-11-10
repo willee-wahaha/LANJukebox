@@ -13,7 +13,7 @@ export const playPlaylist = () =>
   apiRequest<{ success: boolean }>('/playlist/play', { method: 'POST' });
 
 export const playPlaylistFrom = (index: number) =>
-  apiRequest<void>(`/playlist/playfrom/${index}`, { method: 'POST' });
+  apiRequest<void>(`/playlist/play/${index}`, { method: 'POST' });
 
 export const removeFromPlaylist = (index: number) =>
   apiRequest<void>(`/playlist/${index}`, { method: 'DELETE' });

@@ -13,7 +13,7 @@ def index():
         "index.html"
     )
 
-@page_bp.route("/placeholder.svg")
+@page_bp.route("/placeholder")
 def placeholder():
     return send_from_directory(
         "./frontend/dist",

@@ -100,19 +100,9 @@ def get_device():
     return player.get_devices()
 
 
-@player_bp.route("/device", methods=["PUT"])
-def set_device():
-    data = request.get_json()
-    device_id = player.device
-    
-    if data is None:
-        return jsonify({
-            "success": False,
-            "selected_device_id": f"{device_id}",
-            "selected_device_name": devices[device_id]["name"]
-        })
-    
-    device_id = utils.int_check(data.get("device_id", device_id))
+@player_bp.route("/device/<index>", methods=["PUT"])
+def set_device(index):    
+    device_id = utils.int_check(index)
     if device_id is None:
         return jsonify({
             "success": False,
@@ -132,7 +122,6 @@ def set_device():
 @player_bp.route("/mode", methods=["PUT"])
 def set_mode():
     data = request.get_json()
-    print(data)
     
     if data is None:
         return jsonify({

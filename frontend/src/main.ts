@@ -20,6 +20,7 @@ type View = 'home' | 'album' | 'search';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const router = new Router();
+const placeholder: string = import.meta.env.DEV ? '/placeholder.svg' : '/placeholder';
 
 let albums: Album[] = [];
 let albumOrder: AlbumOrder = { key: 'year', way: 'down'};
@@ -48,7 +49,7 @@ const formatTime = (seconds: number): string => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 };
 
-const coverUrl = (url?: string | null): string => url || '/placeholder.svg';
+const coverUrl = (url?: string | null): string => url || placeholder;
 
 function renderShell(): void {
   app.innerHTML = `
@@ -95,7 +96,7 @@ function renderQueuePanel(): string {
         ${playlist.songs.length ? playlist.songs.map((song, index) => `
           <div class="queue-row ${index === playlist.current_index ? 'is-current' : ''}">
             <button class="queue-song" data-play-index="${index}">
-              <img src="${esc(coverUrl(song.cover))}" alt="" onerror="this.src='/placeholder.svg'">
+              <img src="${esc(coverUrl(song.cover))}" alt="" onerror="this.src=${placeholder}">
               <span class="queue-song-info"><strong>${esc(song.title)}</strong><small>${esc(song.artist)}</small></span>
             </button>
             <button class="remove-button" data-remove-queue="${index}" aria-label="移除歌曲">×</button>
@@ -116,9 +117,9 @@ function renderPlayerBar(): string {
       <div class="now-playing">
         <img
           class="now-cover"
-          src="${esc(coverUrl(current?.cover) || '/placeholder.svg')}"
+          src="${esc(coverUrl(current?.cover))}"
           alt=""
-          onerror="this.onerror=null; this.src='/placeholder.svg'"
+          onerror="this.onerror=null; this.src${placeholder}"
         >
         <div class="now-meta">
           <strong>${esc(current?.title || '尚未播放歌曲')}</strong>
@@ -188,7 +189,7 @@ function renderHome(): void {
 function renderAlbumCard(album: Album): string {
   return `
     <button class="album-card" data-open-album="${esc(album.id)}">
-      <div class="cover-wrap"><img src="${esc(coverUrl(album.cover))}" alt="${esc(album.name)} 封面" loading="lazy" onerror="this.src='/placeholder.svg'"><span class="cover-play">▶</span></div>
+      <div class="cover-wrap"><img src="${esc(coverUrl(album.cover))}" alt="${esc(album.name)} 封面" loading="lazy" onerror="this.src=${placeholder}"><span class="cover-play">▶</span></div>
       <strong>${esc(album.name)}</strong>
       <small>${esc(album.albumartist)} · ${album.song_count} 首</small>
     </button>
@@ -217,7 +218,7 @@ function renderAlbumPage(): void {
   content.innerHTML = `
     <button class="back-link" data-action="back-home">← 返回音樂庫</button>
     <section class="album-hero">
-      <img class="album-large-cover" src="${esc(coverUrl(album.cover))}" alt="${esc(album.name)} 封面" onerror="this.src='/placeholder.svg'">
+      <img class="album-large-cover" src="${esc(coverUrl(album.cover))}" alt="${esc(album.name)} 封面" onerror="this.src=${placeholder}">
       <div class="album-info"><span class="eyebrow">ALBUM</span><h1>${esc(album.name)}</h1><p class="album-artist">${esc(album.albumartist)}</p><p class="muted">${album.year ? `${album.year} · ` : ''}${currentAlbumSongs.length} 首歌曲</p>
       <div class="album-actions"><button class="primary-button" data-action="play-album">▶ 播放專輯</button><button class="secondary-button" data-action="add-album">＋ 加入佇列</button></div></div>
     </section>
