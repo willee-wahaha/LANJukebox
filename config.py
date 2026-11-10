@@ -8,13 +8,13 @@ from dotenv import load_dotenv
 env_logger = logging.getLogger('env')
 
 if not load_dotenv():
-    env_logger.warning("沒讀取到環境變數!")
+    env_logger.warning("Can't read .env!")
 
 
 def get_env(key: str, default: Any | None = None) -> Any | None:
     val = os.getenv(key)
     if val is None:
-        env_logger.warning(f"環境變數 \"{key}\" 不存在!")
+        env_logger.warning(f"Enviroment Variable \"{key}\" not exists!")
         return default
 
     return val
