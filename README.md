@@ -10,6 +10,37 @@ Set `FFMPEG_PATH` in `.env` if your ffmpeg is not in global path.
 
 ## Run
 
+- Install python packages
+  ```
+  pip install -r requirements.txt
+  ```
+
+- Install npm dependecies
+  ```
+  cd frontend
+  npm install
+  ```
+
+- Web page
+
+  ```
+  # For build static page.
+  npm run build
+
+  # For develop
+  npm run dev
+  ```
+
+- Run
+  ```
+  python app.py
+  ```
+  or
+  ```
+  waitress-serve --host=0.0.0.0 --port=5000 --call app:create_app
+  ```
+
+On Windows, you can run by these scripts.
 ```
 # install dependecies
 ./install.ps1
