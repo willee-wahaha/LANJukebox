@@ -1,19 +1,7 @@
 import re
-from pathlib import Path
 from typing import Any
 
-import config
 from classes.song import Song
-
-
-def path_fix(filename: str | Path, under_folder: bool) -> str:
-    """
-    Set `under_folder` to `True` to add `DATA_STORE_DIR` to path.
-    """
-    if under_folder:
-        return str(config.DATA_STORE_DIR / filename)
-    else:
-        return filename
 
 
 def remove_invalid_chars(inp: str) -> str:
