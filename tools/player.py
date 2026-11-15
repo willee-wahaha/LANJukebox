@@ -76,6 +76,40 @@ class AudioDecoder:
 
         self.cache_name.append(file_path)
 
+    def read(self, frames: int) -> np.ndarray | None:
+        """
+        Read bytes from ffmpeg.
+        Every unit in list represent a frame
+        """
+
+        if self.process is None:
+            return None
+
+        byte_count = (
+            frames *
+            self.channels *
+            4
+        )
+
+        data = bytearray()
+
+        while len(data) < byte_count:
+
+            chunk = self.process.stdout.read(
+                byte_count - len(data)
+            )
+
+            if not chunk:
+                break
+
+            data.extend(chunk)
+
+        if len(data) == 0:
+            return None
+
+        op_data = np.frombuffer(data, dtype=np.float32).reshape(-1, self.channels)
+        return op_data
+
     def readall(self, frames: int) -> list[np.ndarray]:
         """
         Read bytes from ffmpeg.
@@ -83,12 +117,10 @@ class AudioDecoder:
         """
 
         if self.cache_hit_index is not None:
-            datas = self.cache_data[self.cache_hit_index]
-            self.cache_hit_index = None
-            return datas
+            return self.get_cache()
 
         if self.process is None:
-            return b""
+            return []
 
         byte_count = frames * self.channels * 4
 
@@ -100,13 +132,29 @@ class AudioDecoder:
         ]
         self.close()
 
-        
-        self.cache_data.append(datas)
-        if len(self.cache_name) > self.cache_size:
-            self.cache_name.pop(0) 
-            self.cache_data.pop(0) 
+        self.put_cache(datas)
 
         return datas
+
+    def get_cache(self) -> list[np.ndarray] | None:
+        if self.cache_hit_index is None:
+            return None
+
+        datas = self.cache_data[self.cache_hit_index]
+        self.cache_hit_index = None
+
+        return datas
+
+    def put_cache(self, datas: list):
+        if len(self.cache_name) - len(self.cache_data) > 1:
+            name = self.cache_name[-1]
+            self.cache_name = self.cache_name[:len(self.cache_data)]
+            self.cache_name.append(name)
+
+        self.cache_data.append(datas)
+        if len(self.cache_name) > self.cache_size:
+            self.cache_name.pop(0)
+            self.cache_data.pop(0)
 
     def close(self):
         """
@@ -161,6 +209,7 @@ class AudioPlayer:
 
         self.lock = threading.Lock()
         self.song_finished = threading.Event()
+        self.stop_event = threading.Event()
 
         self.manager = threading.Thread(
             target=self.playback_manager,
@@ -181,6 +230,35 @@ class AudioPlayer:
     # -------------------------
     def decode_once(self):
         self.audio_queue = self.decoder.readall(self.frame)
+
+    def decode_worker(self):
+
+        datas = self.decoder.get_cache()
+        if datas is not None:
+            with self.lock:
+                self.audio_queue = datas
+                self.eof = True
+            return
+
+        self.audio_queue = []
+
+        while not self.stop_event.is_set():
+
+            data = self.decoder.read(self.frame)
+
+            if data is None:
+                self.eof = True
+                break
+
+            with self.lock:
+                if self.audio_queue is None:
+                    return
+                self.audio_queue.append(data)
+
+        self.decoder.close()
+
+        if self.eof and (len(self.audio_queue) * self.frame / self.sample_rate) < 600:
+            self.decoder.put_cache(self.audio_queue)
 
     # -------------------------
     # Play Callback
@@ -209,9 +287,12 @@ class AudioPlayer:
 
             with self.lock:
                 pos = self.position
+                l = len(self.audio_queue)
 
-            if self.audio_queue is None or pos >= len(self.audio_queue):
+            if self.audio_queue is None or pos >= l:
+                print(f"pos:{pos}, l:{l}")
                 break
+            
             chunk = self.audio_queue[pos]
 
             remaining = frames - written
@@ -232,7 +313,7 @@ class AudioPlayer:
             written += count
                 
 
-        if self.audio_queue is None or self.position >= len(self.audio_queue):
+        if self.audio_queue is None or (self.position >= l and self.eof):
             self.song_finished.set()
             with self.lock:
                 self.running = False
@@ -249,6 +330,7 @@ class AudioPlayer:
         self.reset_queue()
 
         self.song_finished.clear()
+        self.stop_event.clear()
 
     def _play_file(self, song: Song):
 
@@ -262,7 +344,11 @@ class AudioPlayer:
         file_path = song.file_path
 
         self.decoder.start(file_path)
-        self.decode_once()
+        self.decode_thread = threading.Thread(
+            target=self.decode_worker,
+            daemon=True
+        )
+        self.decode_thread.start()
 
         player_logger.info(f"Playing Song, id = {song.id}")
 
@@ -333,21 +419,22 @@ class AudioPlayer:
         return self.position * self.frame / self.sample_rate
 
     def stop(self):
+        if self.stream:
+
+            self.stream.stop()
+            self.stream.close()
+
+            self.stream = None
+
+        if self.decode_thread:
+            self.stop_event.set()
+            self.decode_thread.join()
+
+            self.decode_thread = None
+
+        self.decoder.close()
+
         with self.lock:
-            if self.stream:
-
-                self.stream.stop()
-                self.stream.close()
-
-                self.stream = None
-
-            if self.decode_thread:
-                self.decode_thread.join(timeout=2)
-
-                self.decode_thread = None
-
-            self.decoder.close()
-
             self.reset_player()
 
     def next(self):
