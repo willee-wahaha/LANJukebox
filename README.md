@@ -13,11 +13,6 @@ You can contol the player from other devices over local network!
 
 ## Install & Usage
 
-- Install python packages
-  ```
-  pip install -r requirements.txt
-  ```
-
 - Install npm dependecies
   ```
   cd frontend
@@ -32,6 +27,11 @@ You can contol the player from other devices over local network!
 
   # For develop
   npm run dev
+  ```
+
+- Install python packages
+  ```
+  pip install -r requirements.txt
   ```
 
 - Run
