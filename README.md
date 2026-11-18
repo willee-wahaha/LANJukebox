@@ -74,9 +74,9 @@ On Windows, you can simply run by these scripts.
 
   - `DATA_STORE_DIR`: `./Data`
   - `COOKIE_PAT`: `./Data/coockie`
-  - `FFMPEG_PATH`
+  - `FFMPEG_PATH`: `ffmpeg`
 
-    If ffmpeg is in your PATH, you can leave this blank.
+    If ffmpeg is in your PATH, you can also leave this blank.
 
 ## Acknowledgements
 
