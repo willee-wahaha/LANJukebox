@@ -28,8 +28,9 @@ def create_app() -> Flask:
     app.register_blueprint(songs.songs_bp)
     app.register_blueprint(webpage.page_bp)
 
-    main_logger.info(f"Music Folder: {str(config.MUSIC_DIR)}")
-    main_logger.info(f"Exist? {config.MUSIC_DIR.exists()}")
+    for p in config.MUSIC_DIR:
+        main_logger.info(f"Music Folder: {str(p)}")
+        main_logger.info(f"Exist? {p.exists()}")
 
     main_logger.info(f"Data Store Folder: {str(config.DATA_STORE_DIR)}")
     main_logger.info(f"Exist? {config.DATA_STORE_DIR.exists()}")

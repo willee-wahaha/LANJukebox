@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from classes.song import Song
+from tools.song import Song
 
 
 def remove_invalid_chars(inp: str) -> str:

@@ -11,8 +11,6 @@ You can contol the player from other devices over local network!
 - Node.js 24
 - FFmpeg
 
-  Set `FFMPEG_PATH` in `.env` if your ffmpeg is not in global path.
-
 ## Install & Usage
 
 - Install python packages
@@ -61,6 +59,24 @@ On Windows, you can simply run by these scripts.
 # run server
 ./run.ps1 
 ```
+
+## Set .env
+  A `.env` file will be created if program can't find it.
+  
+  Leave the variables blank will use the following default values.
+  - `PORT`: `5000`
+  - `MUSIC_DIR`
+
+    The default folder is current folder.
+  
+    Use `?` to split different folder.
+    e.g. `MUSIC_DIR=D:/music1?D:/music2`
+
+  - `DATA_STORE_DIR`: `./Data`
+  - `COOKIE_PAT`: `./Data/coockie`
+  - `FFMPEG_PATH`
+
+    If ffmpeg is in your PATH, you can leave this blank.
 
 ## Acknowledgements
 

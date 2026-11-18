@@ -2,7 +2,7 @@ import random
 from datetime import datetime
 import threading
 
-from classes.song import Song
+from tools.song import Song
 
 class PlayQueue:
     def __init__(self):

@@ -8,7 +8,7 @@ from mutagen.id3 import ID3
 from thefuzz import fuzz
 
 import config
-from classes.song import Song
+from tools.song import Song
 from tools import rw_file, utils
 
 main_logger = logging.getLogger('main')
@@ -68,9 +68,11 @@ def build_music_list(reload: bool = False):
 
     main_logger.info("Music index not exist, start rebuilding...")
 
-    music_folder = config.MUSIC_DIR
+    music_folder = []
+    for dir in config.MUSIC_DIR:
+        music_folder += list(dir.glob('**/*.*'))
     musics = [
-        f for f in list(Path(music_folder).glob('**/*.*'))
+        f for f in music_folder
         if f.is_file() and f.suffix in config.SUPPORTED_EXTENSIONS
     ]
 
@@ -86,6 +88,8 @@ def build_music_list(reload: bool = False):
     rw_file.json_file_write('albums_to_songs.json', albums_to_songs)
     rw_file.json_file_write('songs.json', songs)
     rw_file.json_file_write('id_to_albums.json', id_to_albums)
+
+    main_logger.info("Build Complete")
 
 
 def scan_music(musics: list[Path]):
@@ -120,8 +124,14 @@ def scan_music(musics: list[Path]):
                 year = year.split('-')[0]
 
 
-        disknum = utils.int_check(re.sub(r"\D", "", audio.get("discnumber", ["0"])[0]), 0)
-        tracknum = utils.int_check(re.sub(r"\D", "", audio.get("tracknumber", ["0"])[0]), 0)
+        disknum = utils.int_check(
+            re.sub(r"\D", "?", audio.get("discnumber", ["0"])[0]).split("?")[0],
+            0
+        )
+        tracknum = utils.int_check(
+            re.sub(r"\D", "?", audio.get("tracknumber", ["0"])[0]).split("?")[0],
+            0
+        )
 
         duration = int(audio.info.length)
 
