@@ -15,7 +15,7 @@ player_bp = Blueprint("player", __name__, url_prefix="/api/player")
 def play():
     data = request.get_json()
 
-    if not data or "song_id" not in data or data["song_id"] not in music.songs:
+    if not data or "song_id" not in data or data["song_id"] not in music.songs.keys():
         return jsonify({"error": "Song Not Exists"}), 400
 
     song = utils.song_dict2class(music.songs[data["song_id"]])

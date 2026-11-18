@@ -110,32 +110,6 @@ class AudioDecoder:
         op_data = np.frombuffer(data, dtype=np.float32).reshape(-1, self.channels)
         return op_data
 
-    def readall(self, frames: int) -> list[np.ndarray]:
-        """
-        Read bytes from ffmpeg.
-        Every unit in list represent a frame
-        """
-
-        if self.cache_hit_index is not None:
-            return self.get_cache()
-
-        if self.process is None:
-            return []
-
-        byte_count = frames * self.channels * 4
-
-        chunk = self.process.stdout.read()
-        data = bytearray(chunk)
-        datas = [
-            np.frombuffer(data[i:i+byte_count], dtype=np.float32).reshape(-1, self.channels)
-            for i in range(0, len(data), byte_count)
-        ]
-        self.close()
-
-        self.put_cache(datas)
-
-        return datas
-
     def get_cache(self) -> list[np.ndarray] | None:
         if self.cache_hit_index is None:
             return None
@@ -228,8 +202,6 @@ class AudioPlayer:
     # -------------------------
     # Decode
     # -------------------------
-    def decode_once(self):
-        self.audio_queue = self.decoder.readall(self.frame)
 
     def decode_worker(self):
 
@@ -290,7 +262,6 @@ class AudioPlayer:
                 l = len(self.audio_queue)
 
             if self.audio_queue is None or pos >= l:
-                print(f"pos:{pos}, l:{l}")
                 break
             
             chunk = self.audio_queue[pos]
@@ -311,7 +282,6 @@ class AudioPlayer:
             ] = chunk[:count] * volume
 
             written += count
-                
 
         if self.audio_queue is None or (self.position >= l and self.eof):
             self.song_finished.set()

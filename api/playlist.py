@@ -15,8 +15,8 @@ playlist_bp = Blueprint("playlist", __name__, url_prefix="/api/playlist")
 @playlist_bp.route("", methods=["GET"])
 def get():
     playlist = []
-    pos, songs = playqueue.get_playlist()
-    for song in songs:
+    pos, pq_songs = playqueue.get_playlist()
+    for song in pq_songs:
         playlist.append({
             "id": song.id,
             "title": song.title,
@@ -39,7 +39,7 @@ def get():
 def add():
     data = request.get_json()
 
-    if not data or "song_id" not in data or data["song_id"] not in music.songs:
+    if not data or "song_id" not in data or data["song_id"] not in music.songs.keys():
         return jsonify({"error": "Song Not Exists"}), 400
 
     player_logger.info(f"Add Song to Queue, id = {data["song_id"]}")

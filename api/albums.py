@@ -24,18 +24,18 @@ def get_all_albums():
 
     albums = []
 
-    for album_id, songs in music.albums_to_songs.items():
+    for album_id, album_songs in music.albums_to_songs.items():
 
-        if not songs:
+        if not album_songs:
             continue
 
         albums.append({
             "id": album_id,
             "name": music.id_to_albums[album_id]["name"],
-            "albumartist": music.songs[songs[0]]["albumartist"],
-            "song_count": len(songs),
-            "year": music.songs[songs[0]]["year"],
-            "cover": music.songs[songs[0]]["thumbnail"]
+            "albumartist": music.songs[album_songs[0]]["albumartist"],
+            "song_count": len(album_songs),
+            "year": music.songs[album_songs[0]]["year"],
+            "cover": music.songs[album_songs[0]]["thumbnail"]
         })
 
     albums = sorted(albums, key=lambda x: (x['year'], x['name']))
@@ -50,10 +50,10 @@ def get_songs(album_id):
     if album_id not in music.id_to_albums.keys():
         abort(404)
 
-    songs = []
+    album_songs = []
     for s in music.albums_to_songs[album_id]:
         song = music.songs[s]
-        songs.append({
+        album_songs.append({
             "id": song["id"],
             "title": song["title"],
             "artist": song["artist"],
@@ -65,7 +65,7 @@ def get_songs(album_id):
             "cover": song["thumbnail"]
         })
 
-    return jsonify(songs)
+    return jsonify(album_songs)
 
 
 @albums_bp.route("/covers/<path:album_id>", methods=["GET"])
@@ -123,18 +123,18 @@ def setorder():
 
     albums = []
     
-    for album_id, songs in music.albums_to_songs.items():
+    for album_id, album_songs in music.albums_to_songs.items():
 
-        if not songs:
+        if not album_songs:
             continue
 
         albums.append({
             "id": album_id,
             "name": music.id_to_albums[album_id]["name"],
-            "albumartist": music.songs[songs[0]]["albumartist"],
-            "song_count": len(songs),
-            "year": music.songs[songs[0]]["year"],
-            "cover": music.songs[songs[0]]["thumbnail"]
+            "albumartist": music.songs[album_songs[0]]["albumartist"],
+            "song_count": len(album_songs),
+            "year": music.songs[album_songs[0]]["year"],
+            "cover": music.songs[album_songs[0]]["thumbnail"]
         })
 
     albums = sorted(albums, key=lambda x: (x[key], x['name']))
