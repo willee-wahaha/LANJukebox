@@ -6,10 +6,14 @@ const catalogs: Record<Locale, Record<string, string>> = { 'zh-TW': zhTW, 'en-US
 let locale: Locale = (localStorage.getItem('music-remote-locale') as Locale) || 'zh-TW';
 if (!(locale in catalogs)) locale = 'zh-TW';
 
+export function getLang(loc: Locale): string {
+  return loc === 'zh-TW' ? 'zh-Hant' : 'en';
+}
+
 export function getLocale(): Locale { return locale; }
 export function setLocale(next: Locale): void {
   locale = next; localStorage.setItem('music-remote-locale', next);
-  document.documentElement.lang = next === 'zh-TW' ? 'zh-Hant' : 'en';
+  document.documentElement.lang = getLang(next);
   translateDOM();
 }
 export function t(key: string): string {

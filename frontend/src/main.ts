@@ -8,7 +8,7 @@ import searchTemplate from './templates/search.html?raw';
 import albumCardTemplate from './templates/album-card.html?raw';
 import songRowTemplate from './templates/song-row.html?raw';
 import { fillTemplate } from './utils/template';
-import { t, getLocale, setLocale, translateDOM, type Locale } from './i18n/i18n';
+import { t, getLang, getLocale, setLocale, translateDOM, type Locale } from './i18n/i18n';
 import { getAlbums, getAlbumSongs, refreshDatabase, setAlbumOrder } from './api/albums';
 import { searchSongs, searchFromYt } from './api/songs';
 import {
@@ -83,11 +83,23 @@ function renderShell(): void {
 }
 
 function renderQueuePanel(): string {
-  const items = playlist.songs.length ? playlist.songs.map((song, index) => `
+  const items = playlist.songs.length ? 
+    playlist.songs.map((song, index) => `
     <div class="queue-row ${index === playlist.current_index ? 'is-current' : ''}">
-      <button class="queue-song" data-play-index="${index}"><img src="${esc(coverUrl(song.cover))}" alt=""><span class="queue-song-info"><strong>${esc(song.title)}</strong><small>${esc(song.artist)}</small></span></button>
+      <button class="queue-song" data-play-index="${index}">
+        <img src="${esc(coverUrl(song.cover))}" alt="">
+        <span class="queue-song-info">
+          <strong>${esc(song.title)}</strong>
+          <small>${esc(song.artist)}</small>
+        </span>
+      </button>
       <button class="remove-button" data-remove-queue="${index}" aria-label="Remove song">×</button>
-    </div>`).join('') : `<div class="empty-state compact"><div class="empty-icon">☷</div><p data-i18n="queue.empty">${esc(t('queue.empty'))}</p><small data-i18n="queue.hint">${esc(t('queue.hint'))}</small></div>`;
+    </div>`).join('') : 
+    `<div class="empty-state compact">
+      <div class="empty-icon">☷</div>
+      <p data-i18n="queue.empty">${esc(t('queue.empty'))}</p>
+      <small data-i18n="queue.hint">${esc(t('queue.hint'))}</small>
+    </div>`;
   return tpl(queueTemplate, { PLAY_DISABLED: playlist.songs.length ? '' : 'disabled', CLEAR_DISABLED: playlist.songs.length ? '' : 'disabled', QUEUE_ITEMS: items });
 }
 
@@ -96,8 +108,8 @@ function renderPlayerBar(): string {
   const duration = playerStatus.duration || currentDurationFromQueue();
   const position = Math.min(playerStatus.position || 0, duration || 0);
   const deviceOptions = audioDevices.length ? 
-  audioDevices.map(device => `<option value="${esc(device.id)}" ${String(playerStatus.output_device?.id ?? '') === String(device.id) ? 'selected' : ''}>${esc(device.name)}${device.is_default ? (getLocale() === 'zh-TW' ? '（預設）' : ' (default)') : ''}</option>`).join('') : 
-  `<option value="">${esc(getLocale() === 'zh-TW' ? '音訊裝置' : 'Audio device')}</option>`;
+  audioDevices.map(device => `<option value="${esc(device.id)}" ${String(playerStatus.output_device?.id ?? '') === String(device.id) ? 'selected' : ''}>${esc(device.name)}${device.is_default ? "(" + t("player.default") + ")" : ''}</option>`).join('') : 
+  `<option value="">${esc(t("player.audioDevice"))}</option>`;
   return tpl(playerTemplate, {
     COVER: esc(coverUrl(current?.cover)), SONG_TITLE: esc(current?.title || t('player.noSong')),
     SONG_ARTIST: esc(current?.artist || t('player.chooseSong')),
@@ -117,13 +129,22 @@ function currentDurationFromQueue(): number {
 
 function renderHome(): void {
   const content = document.querySelector<HTMLDivElement>('#content')!;
-  const options = (['year', 'name', 'artist'] as AlbumSortKey[]).map(key => `<option value="${key}" ${albumOrder.key === key ? 'selected' : ''}>${key === 'year' ? (getLocale() === 'zh-TW' ? '年份' : 'Year') : key === 'name' ? (getLocale() === 'zh-TW' ? '名稱' : 'Name') : (getLocale() === 'zh-TW' ? '演唱者' : 'Artist')}</option>`).join('');
-  content.innerHTML = tpl(homeTemplate, { ALBUM_COUNT: String(albums.length), ORDER_WAY: albumOrder.way === 'up' ? (getLocale() === 'zh-TW' ? '升序' : 'Ascending') : (getLocale() === 'zh-TW' ? '降序' : 'Descending'), ORDER_OPTIONS: options, ALBUM_CARDS: albums.length ? albums.map(renderAlbumCard).join('') : `<div class="empty-state"><div class="empty-icon">♫</div><p>${esc(t('home.empty'))}</p></div>` });
+  const options = (['year', 'name', 'artist'] as AlbumSortKey[]).map(key => 
+    `<option value="${key}" ${albumOrder.key === key ? 'selected' : ''}>
+      ${key === 'year' ? t("common.year") : 
+          key === 'name' ? t("common.name") : t("common.artist")}
+    </option>`
+  ).join('');
+  content.innerHTML = tpl(homeTemplate, { 
+    ALBUM_COUNT: String(albums.length), 
+    ORDER_WAY: albumOrder.way === 'up' ? t("home.ascending") : t("home.descending"), 
+    ORDER_OPTIONS: options, ALBUM_CARDS: albums.length ? albums.map(renderAlbumCard).join('') : `<div class="empty-state"><div class="empty-icon">♫</div><p>${esc(t('home.empty'))}</p></div>`
+  });
   bindContentEvents(); translateDOM(content);
 }
 
 function renderAlbumCard(album: Album): string {
-  return tpl(albumCardTemplate, { ID: esc(album.id), COVER: esc(coverUrl(album.cover)), ALT: esc(`${album.name} ${getLocale() === 'zh-TW' ? '封面' : 'cover'}`), NAME: esc(album.name), ARTIST: esc(album.albumartist), SONG_COUNT: String(album.song_count) });
+  return tpl(albumCardTemplate, { ID: esc(album.id), COVER: esc(coverUrl(album.cover)), ALT: esc(`${album.name} ${t("album.cover")}`), NAME: esc(album.name), ARTIST: esc(album.albumartist), SONG_COUNT: String(album.song_count) });
 }
 
 async function openAlbum(albumId: string): Promise<void> {
@@ -145,7 +166,16 @@ function renderAlbumPage(): void {
   if (!currentAlbum) return;
   const content = document.querySelector<HTMLDivElement>('#content')!;
   const album = currentAlbum;
-  content.innerHTML = tpl(albumTemplate, { COVER: esc(coverUrl(album.cover)), ALBUM_ALT: esc(album.name), ALBUM_NAME: esc(album.name), ARTIST: esc(album.albumartist), YEAR_COUNT: `${album.year ? `${album.year} · ` : ''}${currentAlbumSongs.length} ${getLocale() === 'zh-TW' ? '首歌曲' : 'tracks'}`, SONG_ROWS: currentAlbumSongs.map(renderSongRow).join('') });
+  content.innerHTML = tpl(
+    albumTemplate,
+    { 
+      COVER: esc(coverUrl(album.cover)),
+      ALBUM_ALT: esc(album.name),
+      ALBUM_NAME: esc(album.name),
+      ARTIST: esc(album.albumartist),
+      YEAR_COUNT: `${album.year ? `${album.year} · ` : ''}${currentAlbumSongs.length} ${t("album.utracks")}`,
+      SONG_ROWS: currentAlbumSongs.map(renderSongRow).join('') }
+  );
   bindContentEvents(); translateDOM(content);
 }
 
@@ -179,8 +209,8 @@ async function performSearch(keyword: string): Promise<void> {
       album.albumartist.toLowerCase().includes(keyword.toLowerCase()),
     );
     results.innerHTML = `
-      ${matchedAlbums.length ? `<div class="section-heading"><h2>${esc(t('search.albums'))}</h2><span class="muted">${matchedAlbums.length} ${getLocale() === 'zh-TW' ? '個結果' : 'results'}</span></div><div class="album-grid compact-grid">${matchedAlbums.map(renderAlbumCard).join('')}</div>` : ''}
-      <div class="section-heading"><h2>${esc(t('search.songs'))}</h2><span class="muted">${songs.length} ${getLocale() === 'zh-TW' ? '個結果' : 'results'}</span></div>
+      ${matchedAlbums.length ? `<div class="section-heading"><h2>${esc(t('search.albums'))}</h2><span class="muted">${matchedAlbums.length} ${t("search.results")}</span></div><div class="album-grid compact-grid">${matchedAlbums.map(renderAlbumCard).join('')}</div>` : ''}
+      <div class="section-heading"><h2>${esc(t('search.songs'))}</h2><span class="muted">${songs.length} ${t("search.results")}</span></div>
       <div class="track-list">${songs.length ? songs.map((song, index) => renderSongRow(song, index)).join('') : `<p class="muted">${esc(t('search.noSongs'))}</p>`}</div>
       <div class="section-heading"><button class="yt-button" data-search-yt="${esc(keyword)}" aria-label="從youtube搜尋">▶</button></div>
     `;
@@ -605,7 +635,7 @@ async function setupRouter() {
 
 
 async function initialize(): Promise<void> {
-  document.documentElement.lang = getLocale() === 'zh-TW' ? 'zh-Hant' : 'en';
+  document.documentElement.lang = getLang(getLocale());
   renderShell();
   const content = document.querySelector<HTMLDivElement>('#content')!;
   content.innerHTML = `<div class="loading-state">${esc(t('home.loading'))}</div>`;
