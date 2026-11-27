@@ -1,0 +1,21 @@
+<div class="section-heading">
+    <div>
+        <span class="eyebrow">COLLECTION</span>
+        <h2 data-i18n="home.allAlbums">所有專輯</h2>
+    </div>
+    <div class="album-count">
+        <span class="muted">
+            {{ALBUM_COUNT}} <span data-i18n="common.albums">張專輯</span>
+        </span>
+        <label class="order-picker" title="Sort albums">
+            <button class="back-link" data-action="album-order-way">{{ORDER_WAY}}</button>
+            <select data-control="album-order-key" aria-label="Sort albums">{{ORDER_OPTIONS}}</select>
+        </label>
+    </div>
+</div>
+<div class="album-grid">{{ALBUM_CARDS}}</div>
+<div class="section-heading">
+    <button class="small-button" data-action="refresh-database" data-i18n="home.rescan">
+        重新掃描
+    </button>
+</div>

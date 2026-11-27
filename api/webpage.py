@@ -7,6 +7,7 @@ page_bp = Blueprint("page", __name__, url_prefix="/")
 
 
 @page_bp.route("/", methods=["GET"], defaults={"path": ""})
+@page_bp.route("/page", methods=["GET"], defaults={"path": ""})
 @page_bp.route("/page/<path:path>", methods=["GET"])
 def index(path):
     return send_from_directory(

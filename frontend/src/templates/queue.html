@@ -1,0 +1,16 @@
+<aside class="queue-panel">
+    <div class="panel-heading">
+        <div>
+            <span class="eyebrow">UP NEXT</span>
+            <h2 data-i18n="queue.title">播放佇列</h2>
+        </div>
+        <button class="icon-button" data-action="toggle-queue" aria-label="Close">×</button>
+    </div>
+    <div class="queue-actions">
+        <button class="small-button primary" data-action="play-queue" {{PLAY_DISABLED}} data-i18n="queue.playAll">播放全部</button>
+        <button class="small-button" data-action="clear-queue" {{CLEAR_DISABLED}} data-i18n="queue.clear">清空</button>
+    </div>
+    <div class="queue-list">
+        {{QUEUE_ITEMS}}
+    </div>
+</aside>

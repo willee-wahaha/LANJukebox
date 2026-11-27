@@ -1,0 +1,30 @@
+<button class="back-link" data-action="back-home" data-i18n="album.back">← 返回音樂庫</button>
+<section class="album-hero">
+    <img class="album-large-cover" src="{{COVER}}" alt="{{ALBUM_ALT}}">
+    <div class="album-info">
+        <span class="eyebrow">ALBUM</span>
+        <h1>{{ALBUM_NAME}}</h1>
+        <p class="album-artist">{{ARTIST}}</p>
+        <p class="muted">{{YEAR_COUNT}}</p>
+        <div class="album-actions">
+            <button class="primary-button" data-action="play-album" data-i18n="album.play">▶ 播放專輯</button>
+            <button class="secondary-button" data-action="add-album" data-i18n="album.add">＋ 加入佇列</button>
+        </div>
+    </div>
+</section>
+<div class="section-heading song-heading">
+    <div>
+        <span class="eyebrow">TRACKS</span>
+        <h2 data-i18n="album.tracks">歌曲</h2>
+    </div>
+</div>
+<div class="track-list">
+    <div class="track-header">
+        <span>#</span>
+        <span data-i18n="track.song">歌曲</span>
+        <span data-i18n="track.artist">演唱者</span>
+        <span data-i18n="track.duration">時間</span>
+        <span></span>
+    </div>
+    {{SONG_ROWS}}
+</div>

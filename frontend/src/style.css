@@ -206,3 +206,22 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   .device-picker > span { display: none; }
 }
 
+
+/* Language selector */
+.language-picker {
+  margin: auto 18px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted, #92949b);
+  font-size: 12px;
+}
+.language-picker select {
+  max-width: 112px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 8px;
+  padding: 6px 8px;
+}

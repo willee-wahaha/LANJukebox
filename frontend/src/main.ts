@@ -1,4 +1,14 @@
 import './style.css';
+import shellTemplate from './templates/shell.html?raw';
+import queueTemplate from './templates/queue.html?raw';
+import playerTemplate from './templates/player.html?raw';
+import homeTemplate from './templates/home.html?raw';
+import albumTemplate from './templates/album.html?raw';
+import searchTemplate from './templates/search.html?raw';
+import albumCardTemplate from './templates/album-card.html?raw';
+import songRowTemplate from './templates/song-row.html?raw';
+import { fillTemplate } from './utils/template';
+import { t, getLocale, setLocale, translateDOM, type Locale } from './i18n/i18n';
 import { getAlbums, getAlbumSongs, refreshDatabase, setAlbumOrder } from './api/albums';
 import { searchSongs, searchFromYt } from './api/songs';
 import {
@@ -50,109 +60,53 @@ const formatTime = (seconds: number): string => {
 };
 
 const coverUrl = (url?: string | null): string => url || placeholder;
+const tpl = fillTemplate;
 
 function renderShell(): void {
-  app.innerHTML = `
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="brand"><span class="brand-mark">♫</span><span>Music Remote</span></div>
-        <nav class="nav">
-          <button class="nav-item ${currentView === 'home' ? 'active' : ''}" data-nav="home">⌂ <span>音樂庫</span></button>
-          <button class="nav-item ${currentView === 'search' ? 'active' : ''}" data-nav="search">⌕ <span>搜尋</span></button>
-          <button class="nav-item ${queueOpen ? 'active' : ''}" data-action="toggle-queue">☷ <span>播放佇列</span></button>
-        </nav>
-      </aside>
-
-      <main class="main-area">
-        <header class="topbar">
-          <div class="topbar-title">${currentView === 'album' ? '專輯' : currentView === 'search' ? '搜尋音樂' : '音樂收藏'}</div>
-          <div class="topbar-actions">
-            <span class="connection"><i></i> 本機音樂伺服器</span>
-          </div>
-        </header>
-        <section id="content" class="content"></section>
-      </main>
-
-      ${queueOpen ? renderQueuePanel() : ''}
-      ${renderPlayerBar()}
-    </div>
-    <div id="toast" class="toast" role="status"></div>
-  `;
+  const titleKey = currentView === 'album' ? 'album' : currentView === 'search' ? 'search' : 'library';
+  const title = t(`header.${titleKey}`);
+  app.innerHTML = tpl(shellTemplate, {
+    HOME_ACTIVE: currentView === 'home' ? 'active' : '',
+    SEARCH_ACTIVE: currentView === 'search' ? 'active' : '',
+    QUEUE_ACTIVE: queueOpen ? 'active' : '',
+    TITLE_KEY: titleKey, TITLE: esc(title),
+    QUEUE_PANEL: queueOpen ? renderQueuePanel() : '',
+    PLAYER_BAR: renderPlayerBar(),
+  });
   bindShellEvents();
+  translateDOM(app);
+  app.querySelector<HTMLSelectElement>('#language-select')?.addEventListener('change', event => {
+    setLocale((event.currentTarget as HTMLSelectElement).value as Locale);
+    renderShell();
+    renderCurrentPage();
+  });
 }
 
 function renderQueuePanel(): string {
-  return `
-    <aside class="queue-panel">
-      <div class="panel-heading">
-        <div><span class="eyebrow">UP NEXT</span><h2>播放佇列</h2></div>
-        <button class="icon-button" data-action="toggle-queue" aria-label="關閉">×</button>
-      </div>
-      <div class="queue-actions">
-        <button class="small-button primary" data-action="play-queue" ${playlist.songs.length ? '' : 'disabled'}>播放全部</button>
-        <button class="small-button" data-action="clear-queue" ${playlist.songs.length ? '' : 'disabled'}>清空</button>
-      </div>
-      <div class="queue-list">
-        ${playlist.songs.length ? playlist.songs.map((song, index) => `
-          <div class="queue-row ${index === playlist.current_index ? 'is-current' : ''}">
-            <button class="queue-song" data-play-index="${index}">
-              <img src="${esc(coverUrl(song.cover))}" alt="" onerror="this.src=${placeholder}">
-              <span class="queue-song-info"><strong>${esc(song.title)}</strong><small>${esc(song.artist)}</small></span>
-            </button>
-            <button class="remove-button" data-remove-queue="${index}" aria-label="移除歌曲">×</button>
-          </div>
-        `).join('') : '<div class="empty-state compact"><div class="empty-icon">☷</div><p>播放佇列目前是空的</p><small>在歌曲旁按「加入佇列」即可新增。</small></div>'}
-      </div>
-    </aside>
-  `;
+  const items = playlist.songs.length ? playlist.songs.map((song, index) => `
+    <div class="queue-row ${index === playlist.current_index ? 'is-current' : ''}">
+      <button class="queue-song" data-play-index="${index}"><img src="${esc(coverUrl(song.cover))}" alt=""><span class="queue-song-info"><strong>${esc(song.title)}</strong><small>${esc(song.artist)}</small></span></button>
+      <button class="remove-button" data-remove-queue="${index}" aria-label="Remove song">×</button>
+    </div>`).join('') : `<div class="empty-state compact"><div class="empty-icon">☷</div><p data-i18n="queue.empty">${esc(t('queue.empty'))}</p><small data-i18n="queue.hint">${esc(t('queue.hint'))}</small></div>`;
+  return tpl(queueTemplate, { PLAY_DISABLED: playlist.songs.length ? '' : 'disabled', CLEAR_DISABLED: playlist.songs.length ? '' : 'disabled', QUEUE_ITEMS: items });
 }
 
 function renderPlayerBar(): string {
   const current = playerStatus.current_song;
-  const state = playerStatus.state;
   const duration = playerStatus.duration || currentDurationFromQueue();
   const position = Math.min(playerStatus.position || 0, duration || 0);
-  return `
-    <footer class="player-bar">
-      <div class="now-playing">
-        <img
-          class="now-cover"
-          src="${esc(coverUrl(current?.cover))}"
-          alt=""
-          onerror="this.onerror=null; this.src${placeholder}"
-        >
-        <div class="now-meta">
-          <strong>${esc(current?.title || '尚未播放歌曲')}</strong>
-          <small>${esc(current?.artist || '選擇一首歌曲開始播放')}</small>
-        </div>
-      </div>
-      <div class="player-center">
-        <div class="player-controls">
-          <button class="player-control mode-button ${playerStatus.shuffle ? 'selected' : ''}" data-action="toggle-shuffle" aria-label="${playerStatus.shuffle ? '關閉隨機播放' : '開啟隨機播放'}" title="隨機播放">⤨</button>
-          <button class="player-control subtle" data-action="previous" aria-label="上一首">|◀</button>
-          <button class="player-control play-button" data-action="${state === 'playing' ? 'pause' : 'resume'}" aria-label="${state === 'playing' ? '暫停' : '播放'}">${state === 'playing' ? 'Ⅱ' : '▶'}</button>
-          <button class="player-control subtle" data-action="next" aria-label="下一首">▶|</button>
-          <button class="player-control mode-button ${playerStatus.repeat !== 'off' ? 'selected' : ''}" data-action="cycle-repeat" aria-label="循環模式：${playerStatus.repeat}" title="循環：${playerStatus.repeat}">${playerStatus.repeat === 'one' ? '⟳1' : '⟳'}</button>
-        </div>
-        <div class="progress-row">
-          <span id="current-time">${formatTime(position)}</span>
-          <div class="progress-track" data-action="seek-track"><div class="progress-fill" style="width:${duration ? position / duration * 100 : 0}%"></div></div>
-          <span id="total-time">${formatTime(duration)}</span>
-        </div>
-      </div>
-      <div class="player-right">
-        <button class="icon-button ${queueOpen ? 'selected' : ''}" data-action="toggle-queue" aria-label="播放佇列">☷</button>
-        <label class="device-picker" title="音訊輸出裝置">
-          <span aria-hidden="true">▣</span>
-          <select data-control="device" aria-label="音訊輸出裝置" title="音訊輸出裝置">
-            ${audioDevices.length ? audioDevices.map(device => `<option value="${esc(device.id)}" ${String(playerStatus.output_device?.id ?? '') === String(device.id) ? 'selected' : ''}>${esc(device.name)}${device.is_default ? '（預設）' : ''}</option>`).join('') : '<option value="">音訊裝置</option>'}
-          </select>
-        </label>
-        <span class="volume-symbol">◖</span>
-        <input class="volume-slider" type="range" min="0" max="100" value="${Math.round(playerStatus.volume)}" data-control="volume" aria-label="音量" title="音量 ${Math.round(playerStatus.volume)}%">
-      </div>
-    </footer>
-  `;
+  const deviceOptions = audioDevices.length ? 
+  audioDevices.map(device => `<option value="${esc(device.id)}" ${String(playerStatus.output_device?.id ?? '') === String(device.id) ? 'selected' : ''}>${esc(device.name)}${device.is_default ? (getLocale() === 'zh-TW' ? '（預設）' : ' (default)') : ''}</option>`).join('') : 
+  `<option value="">${esc(getLocale() === 'zh-TW' ? '音訊裝置' : 'Audio device')}</option>`;
+  return tpl(playerTemplate, {
+    COVER: esc(coverUrl(current?.cover)), SONG_TITLE: esc(current?.title || t('player.noSong')),
+    SONG_ARTIST: esc(current?.artist || t('player.chooseSong')),
+    SHUFFLE_SELECTED: playerStatus.shuffle ? 'selected' : '', REPEAT_SELECTED: playerStatus.repeat !== 'off' ? 'selected' : '',
+    PLAY_ACTION: playerStatus.state === 'playing' ? 'pause' : 'resume', PLAY_ICON: playerStatus.state === 'playing' ? 'Ⅱ' : '▶',
+    REPEAT_ICON: playerStatus.repeat === 'one' ? '⟳1' : '⟳', POSITION: formatTime(position), DURATION: formatTime(duration),
+    PROGRESS: String(duration ? position / duration * 100 : 0), QUEUE_SELECTED: queueOpen ? 'selected' : '',
+    DEVICE_OPTIONS: deviceOptions, VOLUME: String(Math.round(playerStatus.volume)),
+  });
 }
 
 function currentDurationFromQueue(): number {
@@ -163,37 +117,13 @@ function currentDurationFromQueue(): number {
 
 function renderHome(): void {
   const content = document.querySelector<HTMLDivElement>('#content')!;
-  content.innerHTML = `
-    <div class="section-heading">
-      <div><span class="eyebrow">COLLECTION</span><h2>所有專輯</h2></div>
-      <div class="album-count">
-        <span class="muted">${albums.length} 張專輯</span>
-        <label class="order-picker" title="專輯排序">
-          <button class="back-link" data-action="album-order-way">${albumOrder.way === "up" ? "升序" : "降序"}</button>
-          <select data-control="album-order-key" aria-label="專輯排序" title="專輯排序">
-            ${['year', 'name', 'artist'].map(key => `<option value="${esc(key)}" ${albumOrder.key === key ? 'selected' : ''}>${esc(key)}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-    </div>
-    <div class="album-grid">
-      ${albums.length ? albums.map(renderAlbumCard).join('') : '<div class="empty-state"><div class="empty-icon">♫</div><p>目前沒有專輯</p></div>'}
-    </div>
-    <div class="section-heading">
-      <button class="small-button" data-action="refresh-database">重新掃描</button>
-    </div>
-  `;
-  bindContentEvents();
+  const options = (['year', 'name', 'artist'] as AlbumSortKey[]).map(key => `<option value="${key}" ${albumOrder.key === key ? 'selected' : ''}>${key === 'year' ? (getLocale() === 'zh-TW' ? '年份' : 'Year') : key === 'name' ? (getLocale() === 'zh-TW' ? '名稱' : 'Name') : (getLocale() === 'zh-TW' ? '演唱者' : 'Artist')}</option>`).join('');
+  content.innerHTML = tpl(homeTemplate, { ALBUM_COUNT: String(albums.length), ORDER_WAY: albumOrder.way === 'up' ? (getLocale() === 'zh-TW' ? '升序' : 'Ascending') : (getLocale() === 'zh-TW' ? '降序' : 'Descending'), ORDER_OPTIONS: options, ALBUM_CARDS: albums.length ? albums.map(renderAlbumCard).join('') : `<div class="empty-state"><div class="empty-icon">♫</div><p>${esc(t('home.empty'))}</p></div>` });
+  bindContentEvents(); translateDOM(content);
 }
 
 function renderAlbumCard(album: Album): string {
-  return `
-    <button class="album-card" data-open-album="${esc(album.id)}">
-      <div class="cover-wrap"><img src="${esc(coverUrl(album.cover))}" alt="${esc(album.name)} 封面" loading="lazy" onerror="this.src=${placeholder}"><span class="cover-play">▶</span></div>
-      <strong>${esc(album.name)}</strong>
-      <small>${esc(album.albumartist)} · ${album.song_count} 首</small>
-    </button>
-  `;
+  return tpl(albumCardTemplate, { ID: esc(album.id), COVER: esc(coverUrl(album.cover)), ALT: esc(`${album.name} ${getLocale() === 'zh-TW' ? '封面' : 'cover'}`), NAME: esc(album.name), ARTIST: esc(album.albumartist), SONG_COUNT: String(album.song_count) });
 }
 
 async function openAlbum(albumId: string): Promise<void> {
@@ -215,48 +145,22 @@ function renderAlbumPage(): void {
   if (!currentAlbum) return;
   const content = document.querySelector<HTMLDivElement>('#content')!;
   const album = currentAlbum;
-  content.innerHTML = `
-    <button class="back-link" data-action="back-home">← 返回音樂庫</button>
-    <section class="album-hero">
-      <img class="album-large-cover" src="${esc(coverUrl(album.cover))}" alt="${esc(album.name)} 封面" onerror="this.src=${placeholder}">
-      <div class="album-info"><span class="eyebrow">ALBUM</span><h1>${esc(album.name)}</h1><p class="album-artist">${esc(album.albumartist)}</p><p class="muted">${album.year ? `${album.year} · ` : ''}${currentAlbumSongs.length} 首歌曲</p>
-      <div class="album-actions"><button class="primary-button" data-action="play-album">▶ 播放專輯</button><button class="secondary-button" data-action="add-album">＋ 加入佇列</button></div></div>
-    </section>
-    <div class="section-heading song-heading"><div><span class="eyebrow">TRACKS</span><h2>歌曲</h2></div></div>
-    <div class="track-list">
-      <div class="track-header"><span>#</span><span>歌曲</span><span>演唱者</span><span>時間</span><span></span></div>
-      ${currentAlbumSongs.map((song, index) => renderSongRow(song, index)).join('')}
-    </div>
-  `;
-  bindContentEvents();
+  content.innerHTML = tpl(albumTemplate, { COVER: esc(coverUrl(album.cover)), ALBUM_ALT: esc(album.name), ALBUM_NAME: esc(album.name), ARTIST: esc(album.albumartist), YEAR_COUNT: `${album.year ? `${album.year} · ` : ''}${currentAlbumSongs.length} ${getLocale() === 'zh-TW' ? '首歌曲' : 'tracks'}`, SONG_ROWS: currentAlbumSongs.map(renderSongRow).join('') });
+  bindContentEvents(); translateDOM(content);
 }
 
 function renderSongRow(song: Song, index: number): string {
-  return `
-    <div class="track-row">
-      <button class="track-play" data-add-song="${esc(song.id)}" aria-label="加入播放佇列">${String(song.tracknumber || index + 1).padStart(2, '0')}</button>
-      <button class="track-title" data-add-song="${esc(song.id)}"><strong>${esc(song.title)}</strong><small>${esc(song.artist)}</small></button>
-      <span class="track-artist">${esc(song.artist)}</span>
-      <span class="track-duration">${formatTime(song.duration)}</span>
-      <button class="add-track" data-play-song="${esc(song.id)}" aria-label="播放">▶</button>
-    </div>
-  `;
+  return tpl(songRowTemplate, { ID: esc(song.id), TRACK: String(song.tracknumber || index + 1).padStart(2, '0'), TITLE: esc(song.title), ARTIST: esc(song.artist), DURATION: formatTime(song.duration) });
 }
 
 async function renderSearch(): Promise<void> {
   const content = document.querySelector<HTMLDivElement>('#content')!;
-  content.innerHTML = `
-    <div class="page-intro"><span class="eyebrow">SEARCH</span><h1>搜尋音樂</h1><p>搜尋專輯或歌曲名稱、歌手。</p></div>
-    <div class="search-box"><span>⌕</span><input id="library-search" type="search" placeholder="輸入專輯、歌曲或歌手..." value="${esc(searchKeyword)}" autofocus></div>
-    <div id="search-results"><p class="muted">輸入關鍵字開始搜尋。</p></div>
-  `;
+  content.innerHTML = tpl(searchTemplate, { KEYWORD: esc(searchKeyword) });
+  translateDOM(content);
   const input = document.querySelector<HTMLInputElement>('#library-search')!;
+  input.placeholder = t('search.placeholder');
   let debounce: number | undefined;
-  input.addEventListener('input', () => {
-    searchKeyword = input.value.trim();
-    window.clearTimeout(debounce);
-    debounce = window.setTimeout(() => void performSearch(searchKeyword), 250);
-  });
+  input.addEventListener('input', () => { searchKeyword = input.value.trim(); window.clearTimeout(debounce); debounce = window.setTimeout(() => void performSearch(searchKeyword), 250); });
   if (searchKeyword) await performSearch(searchKeyword);
 }
 
@@ -264,10 +168,10 @@ async function performSearch(keyword: string): Promise<void> {
   const results = document.querySelector<HTMLDivElement>('#search-results');
   if (!results) return;
   if (!keyword) {
-    results.innerHTML = '<p class="muted">輸入關鍵字開始搜尋。</p>';
+    results.innerHTML = `<p class="muted">${esc(t('search.hint'))}</p>`;
     return;
   }
-  results.innerHTML = '<p class="muted">搜尋中...</p>';
+  results.innerHTML = `<p class="muted">${esc(t('search.loading'))}</p>`;
   try {
     const songs = await searchSongs(keyword);
     const matchedAlbums = albums.filter(album =>
@@ -275,18 +179,30 @@ async function performSearch(keyword: string): Promise<void> {
       album.albumartist.toLowerCase().includes(keyword.toLowerCase()),
     );
     results.innerHTML = `
-      ${matchedAlbums.length ? `<div class="section-heading"><h2>專輯</h2><span class="muted">${matchedAlbums.length} 個結果</span></div><div class="album-grid compact-grid">${matchedAlbums.map(renderAlbumCard).join('')}</div>` : ''}
-      <div class="section-heading"><h2>歌曲</h2><span class="muted">${songs.length} 個結果</span></div>
-      <div class="track-list">${songs.length ? songs.map((song, index) => renderSongRow(song, index)).join('') : '<p class="muted">沒有找到歌曲。</p>'}</div>
+      ${matchedAlbums.length ? `<div class="section-heading"><h2>${esc(t('search.albums'))}</h2><span class="muted">${matchedAlbums.length} ${getLocale() === 'zh-TW' ? '個結果' : 'results'}</span></div><div class="album-grid compact-grid">${matchedAlbums.map(renderAlbumCard).join('')}</div>` : ''}
+      <div class="section-heading"><h2>${esc(t('search.songs'))}</h2><span class="muted">${songs.length} ${getLocale() === 'zh-TW' ? '個結果' : 'results'}</span></div>
+      <div class="track-list">${songs.length ? songs.map((song, index) => renderSongRow(song, index)).join('') : `<p class="muted">${esc(t('search.noSongs'))}</p>`}</div>
       <div class="section-heading"><button class="yt-button" data-search-yt="${esc(keyword)}" aria-label="從youtube搜尋">▶</button></div>
     `;
     bindContentEvents();
+    translateDOM(results);
   } catch (error) {
     results.innerHTML = `<p class="error-text">${esc(errorMessage(error))}</p>`;
   }
 }
 
+function bindImageFallbacks(root: ParentNode): void {
+  root.querySelectorAll<HTMLImageElement>('img').forEach(image => {
+    image.addEventListener('error', () => {
+      if (image.dataset.fallbackApplied) return;
+      image.dataset.fallbackApplied = 'true';
+      image.src = placeholder;
+    }, { once: true });
+  });
+}
+
 function bindShellEvents(): void {
+  bindImageFallbacks(app);
   app.querySelectorAll<HTMLElement>('[data-nav]').forEach(button => {
     button.addEventListener('click', () => {
       const target = button.dataset.nav as View;
@@ -309,6 +225,7 @@ function bindShellEvents(): void {
 }
 
 function bindContentEvents(): void {
+  bindImageFallbacks(document.querySelector('#content') || document);
   document.querySelectorAll<HTMLElement>('[data-open-album]').forEach(button => {
     button.addEventListener('click', () => router.navigate(`/page/album/${button.dataset.openAlbum}`));
   });
@@ -362,17 +279,17 @@ async function handleAction(action: string): Promise<void> {
           await addSongsToQueue(currentAlbumSongs);
           await playPlaylist();
           await refreshPlayerAndQueue();
-          showToast('開始播放專輯');
+          showToast(t('msg.albumPlaying'));
         }
         break;
       case 'add-album':
         await addSongsToQueue(currentAlbumSongs);
-        showToast('已將專輯加入播放佇列');
+        showToast(t('msg.albumAdded'));
         break;
       case 'play-queue':
         await playPlaylist();
         await refreshPlayerAndQueue();
-        showToast('開始播放佇列');
+        showToast(t('msg.queuePlaying'));
         break;
       case 'clear-queue':
         await clearPlaylist();
@@ -433,7 +350,7 @@ async function playSelectedSong(songId: string): Promise<void> {
   try {
     await playSong(songId);
     await refreshPlayerAndQueue();
-    showToast('正在播放');
+    showToast(t('msg.playing'));
   } catch (error) {
     showToast(errorMessage(error));
   }
@@ -443,7 +360,7 @@ async function addSongToQueue(songId: string): Promise<void> {
   try {
     await addToPlaylist(songId);
     await refreshQueue();
-    showToast('已加入播放佇列');
+    showToast(t('msg.added'));
     if (queueOpen) {
       renderShell();
       if (currentView === 'home') renderHome();
@@ -464,7 +381,7 @@ async function searchYt(text: string): Promise<void> {
     if (text){
       await searchFromYt(text)
       await refreshQueue();
-      showToast('已加入播放佇列');
+      showToast(t('msg.added'));
     }
     showToast(text);
   }
@@ -477,7 +394,7 @@ async function playFromIndex(index: number): Promise<void> {
   try {
     await playPlaylistFrom(index);
     await refreshPlayerAndQueue();
-    showToast('正在播放');
+    showToast(t('msg.playing'));
   } catch (error) {
     showToast(errorMessage(error));
   }
@@ -533,7 +450,7 @@ function bindPlayerControls(bar: HTMLElement | null): void {
     const value = Number((event.currentTarget as HTMLInputElement).value);
     void setPlayerVolume(value).then(() => {
       playerStatus.volume = value;
-      showToast(`音量 ${value}%`);
+      showToast(`${t('msg.volume')} ${value}%`);
     }).catch(error => showToast(errorMessage(error)));
   });
   bar.querySelector<HTMLSelectElement>('[data-control="device"]')?.addEventListener('change', async event => {
@@ -544,7 +461,7 @@ function bindPlayerControls(bar: HTMLElement | null): void {
     try {
       const result = await setAudioDevice(select.value);
       playerStatus.output_device = { id: result.selected_device_id, name: result.selected_device_name };
-      showToast(`音訊輸出已切換：${result.selected_device_name}`);
+      showToast(`${t('msg.deviceChanged')}${result.selected_device_name}`);
     } catch (error) {
       showToast(errorMessage(error));
       await loadAudioDevices();
@@ -565,12 +482,12 @@ function bindPlayerControls(bar: HTMLElement | null): void {
       const rect = track.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, ((event as PointerEvent).clientX - rect.left) / rect.width));
       const duration = playerStatus.duration || currentDurationFromQueue();
-      if (!duration) return showToast('目前沒有可調整進度的歌曲');
+      if (!duration) return showToast(t('player.noSeek'));
       void seekPlayer(Math.round(ratio * duration)).then(async result => {
         playerStatus.position = result.position;
         playerStatus.duration = result.duration;
         await refreshPlayer();
-        showToast(`已跳至 ${formatTime(result.position)}`);
+        showToast(`${t('msg.seek')} ${formatTime(result.position)}`);
       }).catch(error => showToast(errorMessage(error)));
     });
     track.addEventListener('keydown', event => {
@@ -589,8 +506,8 @@ async function updateMode(mode: { shuffle: boolean; repeat: RepeatMode }): Promi
   playerStatus.shuffle = result.shuffle;
   playerStatus.repeat = result.repeat;
   updatePlayerBar();
-  const repeatLabel = result.repeat === 'off' ? '關閉循環' : result.repeat === 'one' ? '單曲循環' : '全部循環';
-  showToast(`${result.shuffle ? '隨機播放開啟' : '隨機播放關閉'} · ${repeatLabel}`);
+  const repeatLabel = result.repeat === 'off' ? t('msg.repeatOff') : result.repeat === 'one' ? t('msg.repeatOne') : t('msg.repeatAll');
+  showToast(`${result.shuffle ? t('msg.shuffleOn') : t('msg.shuffleOff')} · ${repeatLabel}`);
 }
 
 async function loadAudioDevices(): Promise<void> {
@@ -642,7 +559,13 @@ function showToast(message: string): void {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '發生未知錯誤';
+  return error instanceof Error ? error.message : t('msg.unknown');
+}
+
+function renderCurrentPage(): void {
+  if (currentView === 'home') renderHome();
+  else if (currentView === 'album') renderAlbumPage();
+  else void renderSearch();
 }
 
 async function setupRouter() {
@@ -656,20 +579,22 @@ async function setupRouter() {
   });
 
   // Route 2: SearchPage (Support /search?q=xxx)
-  router.addRoute('/page/search', async (params) => {
+  const searchHandler = async (_params: Record<string, string>) => {
     currentView = 'search';
-    searchKeyword = params.query || '';
+    searchKeyword = new URLSearchParams(window.location.search).get('q') || ''; 
     renderShell();
     await renderSearch();
     window.scrollTo(0, 0);
-  });
+  };
+  router.addRoute('/page/search', searchHandler);
 
   // Route 3: AlbumPage (Support /album/xxx)
-  router.addRoute('/page/album/:id', async (params) => {
+  const albumHandler = async (params: Record<string, string>) => {
     currentView = 'album';
     if (params.id) await openAlbum(params.id);
     window.scrollTo(0, 0);
-  });
+  };
+  router.addRoute('/page/album/:id', albumHandler);
 
   // Listening Previous & Next Page
   window.addEventListener('popstate', () => router.resolve());
@@ -680,14 +605,22 @@ async function setupRouter() {
 
 
 async function initialize(): Promise<void> {
+  document.documentElement.lang = getLocale() === 'zh-TW' ? 'zh-Hant' : 'en';
   renderShell();
   const content = document.querySelector<HTMLDivElement>('#content')!;
-  content.innerHTML = '<div class="loading-state">正在載入音樂收藏…</div>';
+  content.innerHTML = `<div class="loading-state">${esc(t('home.loading'))}</div>`;
   try {
     albums = await getAlbums();
     renderHome();
   } catch (error) {
-    content.innerHTML = `<div class="empty-state"><div class="empty-icon">!</div><p>無法載入音樂庫</p><small>${esc(errorMessage(error))}</small><button class="secondary-button retry-button" id="retry-load">重新載入</button></div>`;
+    content.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">!</div>
+      <p>無法載入音樂庫</p>
+      <small>${esc(errorMessage(error))}</small>
+      <button class="secondary-button retry-button" id="retry-load">重新載入</button>
+    </div>
+    `;
     document.querySelector('#retry-load')?.addEventListener('click', () => void initialize());
   }
   await Promise.all([refreshPlayer(), refreshQueue(), loadAudioDevices()]);
