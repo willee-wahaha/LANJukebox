@@ -290,8 +290,8 @@ function bindShellEvents(): void {
   app.querySelectorAll<HTMLElement>('[data-nav]').forEach(button => {
     button.addEventListener('click', () => {
       const target = button.dataset.nav as View;
-      if (target === 'home') router.navigate('/');
-      else if (target === 'search') router.navigate('/search');
+      if (target === 'home') router.navigate('/page');
+      else if (target === 'search') router.navigate('/page/search');
     });
   });
   app.querySelectorAll<HTMLElement>('[data-action]').forEach(button => {
@@ -310,7 +310,7 @@ function bindShellEvents(): void {
 
 function bindContentEvents(): void {
   document.querySelectorAll<HTMLElement>('[data-open-album]').forEach(button => {
-    button.addEventListener('click', () => router.navigate(`/album/${button.dataset.openAlbum}`));
+    button.addEventListener('click', () => router.navigate(`/page/album/${button.dataset.openAlbum}`));
   });
   document.querySelectorAll<HTMLElement>('[data-play-song]').forEach(button => {
     button.addEventListener('click', () => void playSelectedSong(button.dataset.playSong!));
@@ -354,7 +354,7 @@ async function handleAction(action: string): Promise<void> {
         else void renderSearch();
         break;
       case 'back-home':
-        router.navigate('/');
+        router.navigate('/page');
         break;
       case 'play-album':
         if (currentAlbumSongs.length) {
@@ -647,7 +647,7 @@ function errorMessage(error: unknown): string {
 
 async function setupRouter() {
   // Route 1: HomePage
-  router.addRoute('/', async () => {
+  router.addRoute('/page', async () => {
     currentView = 'home';
     currentAlbum = null;
     renderShell();
@@ -656,7 +656,7 @@ async function setupRouter() {
   });
 
   // Route 2: SearchPage (Support /search?q=xxx)
-  router.addRoute('/search', async (params) => {
+  router.addRoute('/page/search', async (params) => {
     currentView = 'search';
     searchKeyword = params.query || '';
     renderShell();
@@ -665,7 +665,7 @@ async function setupRouter() {
   });
 
   // Route 3: AlbumPage (Support /album/xxx)
-  router.addRoute('/album/:id', async (params) => {
+  router.addRoute('/page/album/:id', async (params) => {
     currentView = 'album';
     if (params.id) await openAlbum(params.id);
     window.scrollTo(0, 0);

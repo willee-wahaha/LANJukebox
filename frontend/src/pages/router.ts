@@ -30,6 +30,6 @@ export class Router {
       }
     }
     // Default Page is HomePage
-    this.navigate('/');
+    this.navigate('/page');
   }
 }
