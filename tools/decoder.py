@@ -6,6 +6,8 @@ import numpy as np
 
 import config
 
+player_logger = logging.getLogger('player')
+
 class AudioDecoder:
 
     def __init__(
@@ -29,6 +31,7 @@ class AudioDecoder:
     def start(self, file_path: str, start_time: int = 0):
 
         if file_path in self.cache_name:
+            player_logger.info("Cache Hit!")
             self.cache_hit_index = self.cache_name.index(file_path)
             return
 
@@ -36,9 +39,9 @@ class AudioDecoder:
             config.FFMPEG_PATH,
             "-nostdin",
             "-v", "error",
-            "-i", file_path,
-
             "-ss", str(start_time),
+
+            "-i", file_path,
 
             "-f", "f32le",
             "-acodec", "pcm_f32le",
@@ -55,7 +58,8 @@ class AudioDecoder:
             bufsize=0
         )
 
-        self.file_path = file_path
+        if start_time == 0:
+            self.file_path = file_path
 
     def read(self, frames: int) -> np.ndarray | None:
         """
@@ -101,6 +105,9 @@ class AudioDecoder:
         return datas
 
     def put_cache(self, datas: list):
+        if self.file_path is None:
+            return
+
         self.cache_name.append(self.file_path)
         self.cache_data.append(datas)
         if len(self.cache_name) > self.cache_size:

@@ -1,5 +1,5 @@
-import ctypes
 import logging
+import queue
 import threading
 
 import sounddevice as sd
@@ -35,7 +35,8 @@ class AudioPlayer:
         device: int,
         sample_rate: int = 44100,
         channels: int = 2,
-        frame: int = 4096
+        frame: int = 4096,
+        max_sec: int = 600
     ):
 
         self.device = device
@@ -75,6 +76,12 @@ class AudioPlayer:
         self.stream = None
         self.decode_thread = None
 
+        # 0 for local, 1 for yt
+        self.mode = 0
+
+        self.max_sec = max_sec
+        self.max_len = self.max_sec * self.sample_rate / self.frame
+
     def reset_queue(self):
         self._audio_queue = None
 
@@ -87,27 +94,62 @@ class AudioPlayer:
         datas = self.decoder.get_cache()
         if datas is not None:
             with self.lock:
+                self.mode = 0
                 self._audio_queue = datas
                 self.eof = True
             return
 
-        self._audio_queue = []
+        if self.mode == 1:
+            self._yt_worker()
+        else:
+            self._local_worker()
 
+        self.decoder.close()
+
+    def _local_worker(self):
+        self._audio_queue = []
+        
         while not self.decode_stop.is_set():
 
             data = self.decoder.read(self.frame)
 
             if data is None:
                 self.eof = True
+                player_logger.info("Decode Complete!")
                 break
 
             with self.lock:
                 self._audio_queue.append(data)
 
-        if self.eof and (len(self._audio_queue) * self.frame / self.sample_rate) < 600:
+        if self.eof and len(self._audio_queue) < self.max_len:
             self.decoder.put_cache(self._audio_queue)
 
-        self.decoder.close()
+    def _yt_worker(self):
+        self._audio_queue = queue.Queue(maxsize=self.max_len)
+        backup = []
+        while not self.decode_stop.is_set():
+
+            if self._audio_queue.full():
+                threading.Event().wait(0.005)
+                continue
+
+            data = self.decoder.read(self.frame)
+
+            if data is None:
+                self.eof = True
+                player_logger.info("Decode Complete!")
+                break
+
+            self._audio_queue.put(data)
+
+            if backup is not None:
+                backup.append(data)
+                if len(backup) >= self.max_len:
+                    backup = None
+
+        if backup is not None and self.eof:
+            self.decoder.put_cache(backup)
+
 
     # -------------------------
     # Play Callback
@@ -131,17 +173,17 @@ class AudioPlayer:
                 return
 
         written = 0
+        end = False
 
         while written < frames:
 
-            with self.lock:
-                pos = self.position
-                l = len(self._audio_queue)
+            if self.mode == 1:
+                chunk, end = self._yt_callback()
+            else:
+                chunk, end = self._local_callback()
 
-            if self._audio_queue is None or pos >= l:
+            if chunk is None:
                 break
-            
-            chunk = self._audio_queue[pos]
 
             remaining = frames - written
 
@@ -160,17 +202,37 @@ class AudioPlayer:
 
             written += count
 
-        if self._audio_queue is None or (self.position >= l and self.eof):
+        if self._audio_queue is None or (self.eof and end):
             self.song_finished.set()
             with self.lock:
                 self.running = False
             raise sd.CallbackStop()
+
+    def _local_callback(self):
+        with self.lock:
+            pos = self.position
+            l = len(self._audio_queue)
+
+        if self._audio_queue is None or pos >= l:
+            return None, True
+        
+        return self._audio_queue[pos], False
+
+    def _yt_callback(self):
+        try:
+            chunk = self._audio_queue.get_nowait()
+        except queue.Empty:
+            chunk = None
+
+        end = self._audio_queue.empty()
+        return chunk, end
 
     # -------------------------
     # Player Controls
     # -------------------------
     def reset_player(self):
         self.position = 0
+        self.mode = 0
         self.running = False
         self.paused = False
         self.eof = False
@@ -179,7 +241,7 @@ class AudioPlayer:
         self.song_finished.clear()
         self.decode_stop.clear()
 
-    def _play_file(self, song: Song):
+    def _play_file(self, song: Song, sec: int = 0):
 
         with self.lock:
             if self.running:
@@ -187,19 +249,24 @@ class AudioPlayer:
 
             self.reset_player()
             self.running = True
+            self.position = int(sec * self.sample_rate / self.frame)
 
         file_path = song.file_path
+        if song.id == "yt" or song.duration > self.max_sec:
+            with self.lock:
+                self.mode = 1
+            s = sec
+        else:
+            s = 0
 
-        self.decoder.start(file_path)
+        self.decoder.start(file_path, s)
         self.decode_thread = threading.Thread(
             target=self._decode_worker,
             daemon=True
         )
         self.decode_thread.start()
 
-        player_logger.info(f"Playing Song, id = {song.id}")
-
-        #rc = ctypes.windll.ole32.CoInitialize(None)
+        player_logger.info(f"Playing Song, id = {song.id}, sec = {sec}")
 
         self.stream = sd.OutputStream(
             samplerate=self.sample_rate,
@@ -210,9 +277,6 @@ class AudioPlayer:
             callback=self._callback,
         )
         self.stream.start()
-
-        #if rc in (0, 1):
-        #    ctypes.windll.ole32.CoUninitialize()
 
     def play(self, song: Song):
         playqueue.add(song)
@@ -308,6 +372,11 @@ class AudioPlayer:
         with self.lock:
             self.position = int(sec * self.sample_rate / self.frame)
 
+        if self.mode == 1:
+            self.stop()
+            now = playqueue.nowplay
+            self._play_file(now, sec)
+
     def get_devices(self) -> dict[str, str | list]:
         get_devices()
         outputd = [
@@ -321,25 +390,28 @@ class AudioPlayer:
         }
 
     def set_device(self, index: int) -> bool:
-        if str(index) in devices.keys():
-            player_logger.info(f"Change Device, id = {index}")
-            self.device = index
-            pos = self.position
-            self.stop()
+        if str(index) not in devices.keys():
+            return False
 
-            self.sample_rate = devices[str(index)]["default_samplerate"]
-            self.channels = devices[str(index)]["max_output_channels"]
+        player_logger.info(f"Change Device, id = {index}")
+        self.device = index
+        sec = int(self.get_position())
+
+        self.sample_rate = devices[str(index)]["default_samplerate"]
+        self.channels = devices[str(index)]["max_output_channels"]
+        self.max_len = self.max_sec * self.sample_rate / self.frame
+
+        if self.sample_rate != self.decoder.sample_rate or self.channels != self.decoder.channels:
+            self.stop()
             self.decoder = AudioDecoder(
                 sample_rate=self.sample_rate,
                 channels=self.channels
             )
 
             if playqueue.nowplay is not None:
-                self._play_file(playqueue.nowplay)
-            self.position = pos
-            return True
+                self._play_file(playqueue.nowplay, sec)
 
-        return False
+        return True
 
     def status(self) -> dict:
 
@@ -402,9 +474,9 @@ class AudioPlayer:
         self.manager.join()
         self.reset_player()
 
-
+first_device = sd.query_devices(kind="output")
 player = AudioPlayer(
-    device=sd.query_devices(kind="output")['index'],
-    sample_rate=sd.query_devices(kind="output")['default_samplerate'],
-    channels=sd.query_devices(kind="output")['max_output_channels'],
+    device=first_device['index'],
+    sample_rate=first_device['default_samplerate'],
+    channels=first_device['max_output_channels'],
 )

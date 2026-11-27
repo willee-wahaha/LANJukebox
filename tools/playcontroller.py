@@ -1,4 +1,6 @@
+import ctypes
 import queue
+import sys
 import threading
 
 
@@ -18,6 +20,7 @@ class PlayController:
 
         self.taskque = queue.Queue()
         self.newtask_appear = threading.Event()
+        self.end_task = threading.Event()
         self.wait_task = False
         self.lock = threading.Lock()
 
@@ -28,7 +31,10 @@ class PlayController:
         self.tasker.start()
 
     def exec_task(self):
-        while True:
+        if sys.platform == "win32":
+            ctypes.windll.ole32.CoInitialize(None)
+
+        while not self.end_task.is_set():
             try:
                 task = self.taskque.get_nowait()
             except queue.Empty:
@@ -44,6 +50,9 @@ class PlayController:
                     t.action()
                 else:
                     t.action(t.param[0])
+
+        if sys.platform == "win32":
+            ctypes.windll.ole32.CoUninitialize()
 
     def put_task(self, tasks: list[Task]):
         self.taskque.put(tasks)
