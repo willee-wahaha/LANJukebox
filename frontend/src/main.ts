@@ -144,7 +144,17 @@ function renderHome(): void {
 }
 
 function renderAlbumCard(album: Album): string {
-  return tpl(albumCardTemplate, { ID: esc(album.id), COVER: esc(coverUrl(album.cover)), ALT: esc(`${album.name} ${t("album.cover")}`), NAME: esc(album.name), ARTIST: esc(album.albumartist), SONG_COUNT: String(album.song_count) });
+  return tpl(
+    albumCardTemplate,
+    { 
+      ID: esc(album.id),
+      COVER: esc(coverUrl(album.cover)),
+      ALT: esc(`${album.name} ${t("album.cover")}`),
+      NAME: esc(album.name),
+      ARTIST: esc(album.albumartist),
+      SONG_COUNT: String(album.song_count)
+    }
+  );
 }
 
 async function openAlbum(albumId: string): Promise<void> {

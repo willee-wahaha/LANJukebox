@@ -209,7 +209,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 
 /* Language selector */
 .language-picker {
-  margin: auto 18px 18px;
+  margin: auto 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
