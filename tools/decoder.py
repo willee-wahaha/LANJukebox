@@ -22,9 +22,11 @@ class AudioDecoder:
         self.cache_hit_index = None
         self.cache_size = cache_size
 
+        self.file_path = None
+
         self.process = None
 
-    def start(self, file_path: str):
+    def start(self, file_path: str, start_time: int = 0):
 
         if file_path in self.cache_name:
             self.cache_hit_index = self.cache_name.index(file_path)
@@ -35,6 +37,8 @@ class AudioDecoder:
             "-nostdin",
             "-v", "error",
             "-i", file_path,
+
+            "-ss", str(start_time),
 
             "-f", "f32le",
             "-acodec", "pcm_f32le",
@@ -51,7 +55,7 @@ class AudioDecoder:
             bufsize=0
         )
 
-        self.cache_name.append(file_path)
+        self.file_path = file_path
 
     def read(self, frames: int) -> np.ndarray | None:
         """
@@ -97,11 +101,7 @@ class AudioDecoder:
         return datas
 
     def put_cache(self, datas: list):
-        if len(self.cache_name) - len(self.cache_data) > 1:
-            name = self.cache_name[-1]
-            self.cache_name = self.cache_name[:len(self.cache_data)]
-            self.cache_name.append(name)
-
+        self.cache_name.append(self.file_path)
         self.cache_data.append(datas)
         if len(self.cache_name) > self.cache_size:
             self.cache_name.pop(0)
@@ -124,3 +124,5 @@ class AudioDecoder:
             self.process.stdout.close()
 
         self.process = None
+        self.file_path = None
+        self.cache_hit_index = None

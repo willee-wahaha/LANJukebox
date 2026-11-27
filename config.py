@@ -10,7 +10,7 @@ template = """PORT=5000
 MUSIC_DIR=
 DATA_STORE_DIR=./Data
 COOKIE_PATH=./Data/coockie
-FFMPEG_PATH=
+FFMPEG_PATH=ffmpeg
 """
 
 if not load_dotenv():

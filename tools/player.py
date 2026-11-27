@@ -48,7 +48,7 @@ class AudioPlayer:
             channels
         )
 
-        self.audio_queue = None
+        self._audio_queue = None
         self.reset_queue()
 
         # Play position, a.k.a. index of audio_queue
@@ -62,10 +62,12 @@ class AudioPlayer:
 
         self.lock = threading.Lock()
         self.song_finished = threading.Event()
-        self.stop_event = threading.Event()
+        self.decode_finished = threading.Event()
+        self.decode_stop = threading.Event()
+        self.manager_stop = threading.Event()
 
         self.manager = threading.Thread(
-            target=self.playback_manager,
+            target=self._playback_manager,
             daemon=True
         )
         self.manager.start()
@@ -73,27 +75,25 @@ class AudioPlayer:
         self.stream = None
         self.decode_thread = None
 
-        self.init_count = 0
-
     def reset_queue(self):
-        self.audio_queue = None
+        self._audio_queue = None
 
     # -------------------------
     # Decode
     # -------------------------
 
-    def decode_worker(self):
+    def _decode_worker(self):
 
         datas = self.decoder.get_cache()
         if datas is not None:
             with self.lock:
-                self.audio_queue = datas
+                self._audio_queue = datas
                 self.eof = True
             return
 
-        self.audio_queue = []
+        self._audio_queue = []
 
-        while not self.stop_event.is_set():
+        while not self.decode_stop.is_set():
 
             data = self.decoder.read(self.frame)
 
@@ -102,20 +102,18 @@ class AudioPlayer:
                 break
 
             with self.lock:
-                if self.audio_queue is None:
-                    return
-                self.audio_queue.append(data)
+                self._audio_queue.append(data)
+
+        if self.eof and (len(self._audio_queue) * self.frame / self.sample_rate) < 600:
+            self.decoder.put_cache(self._audio_queue)
 
         self.decoder.close()
-
-        if self.eof and (len(self.audio_queue) * self.frame / self.sample_rate) < 600:
-            self.decoder.put_cache(self.audio_queue)
 
     # -------------------------
     # Play Callback
     # -------------------------
 
-    def callback(
+    def _callback(
         self,
         outdata,
         frames,
@@ -138,12 +136,12 @@ class AudioPlayer:
 
             with self.lock:
                 pos = self.position
-                l = len(self.audio_queue)
+                l = len(self._audio_queue)
 
-            if self.audio_queue is None or pos >= l:
+            if self._audio_queue is None or pos >= l:
                 break
             
-            chunk = self.audio_queue[pos]
+            chunk = self._audio_queue[pos]
 
             remaining = frames - written
 
@@ -162,7 +160,7 @@ class AudioPlayer:
 
             written += count
 
-        if self.audio_queue is None or (self.position >= l and self.eof):
+        if self._audio_queue is None or (self.position >= l and self.eof):
             self.song_finished.set()
             with self.lock:
                 self.running = False
@@ -179,7 +177,7 @@ class AudioPlayer:
         self.reset_queue()
 
         self.song_finished.clear()
-        self.stop_event.clear()
+        self.decode_stop.clear()
 
     def _play_file(self, song: Song):
 
@@ -194,14 +192,14 @@ class AudioPlayer:
 
         self.decoder.start(file_path)
         self.decode_thread = threading.Thread(
-            target=self.decode_worker,
+            target=self._decode_worker,
             daemon=True
         )
         self.decode_thread.start()
 
         player_logger.info(f"Playing Song, id = {song.id}")
 
-        rc = ctypes.windll.ole32.CoInitialize(None)
+        #rc = ctypes.windll.ole32.CoInitialize(None)
 
         self.stream = sd.OutputStream(
             samplerate=self.sample_rate,
@@ -209,12 +207,12 @@ class AudioPlayer:
             dtype="float32",
             blocksize=self.frame,
             device=self.device,
-            callback=self.callback,
+            callback=self._callback,
         )
         self.stream.start()
 
-        if rc in (0, 1):
-            ctypes.windll.ole32.CoUninitialize()
+        #if rc in (0, 1):
+        #    ctypes.windll.ole32.CoUninitialize()
 
     def play(self, song: Song):
         playqueue.add(song)
@@ -276,12 +274,10 @@ class AudioPlayer:
             self.stream = None
 
         if self.decode_thread:
-            self.stop_event.set()
+            self.decode_stop.set()
             self.decode_thread.join()
 
             self.decode_thread = None
-
-        self.decoder.close()
 
         with self.lock:
             self.reset_player()
@@ -387,9 +383,11 @@ class AudioPlayer:
 
         return status
 
-    def playback_manager(self):
+    def _playback_manager(self):
         while True:
             self.song_finished.wait()
+            if self.manager_stop.is_set():
+                return
 
             player_logger.info("Music Ends")
 
@@ -399,7 +397,10 @@ class AudioPlayer:
 
     def close(self):
         self.stop()
+        self.manager_stop.set()
+        self.song_finished.set()
         self.manager.join()
+        self.reset_player()
 
 
 player = AudioPlayer(
